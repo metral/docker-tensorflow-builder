@@ -2,12 +2,12 @@
 set -e
 export PATH="/conda/bin:/usr/bin:$PATH"
 
-
 # Install an appropriate Python environment
 chmod +x /conda/bin/*
 conda create --yes -n tensorflow python==$PYTHON_VERSION
 source activate tensorflow
-conda install --yes numpy wheel bazel
+#conda install --yes numpy wheel bazel
+conda install --yes numpy wheel
 
 # Compile TensorFlow
 

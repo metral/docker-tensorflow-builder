@@ -1,19 +1,47 @@
-FROM nvidia/cuda:9.2-cudnn7-runtime-ubuntu18.04
+FROM nvidia/cuda:9.2-cudnn7-runtime-ubuntu16.04
 
 ENV TF_VERSION_GIT_TAG=v1.10.1
-ENV PYTHON_VERSION=3.7.0
+ENV PYTHON_VERSION=3.6.5
 ENV CUDA_SERIES=9.2
 ENV CUDA_VERSION=9.2.148_396.37
-ENV NCCL_VERSION 2.2.12
 
-RUN apt update && apt install -y \
-    build-essential \
-    curl \
-    git \
-    wget \
-    #libjpeg-dev \
-    #openjdk-8-jdk \
-    && rm -rf /var/lib/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	build-essential \
+	cuda-command-line-tools-9-2 \
+	cuda-cublas-dev-9-2 \
+	cuda-cudart-dev-9-2 \
+	cuda-cufft-dev-9-2 \
+	cuda-curand-dev-9-2 \
+	cuda-cusolver-dev-9-2 \
+	cuda-cusparse-dev-9-2 \
+	curl \
+	git \
+	libcudnn7=7.2.1.38-1+cuda9.2 \
+	libcudnn7-dev=7.2.1.38-1+cuda9.2 \
+	libnccl2=2.2.13-1+cuda9.2 \
+	libnccl-dev=2.2.13-1+cuda9.2 \
+	libcurl3-dev \
+	libfreetype6-dev \
+	libhdf5-serial-dev \
+	libpng12-dev \
+	libzmq3-dev \
+	pkg-config \
+	rsync \
+	software-properties-common \
+	unzip \
+	zip \
+	zlib1g-dev \
+	wget \
+	&& \
+	rm -rf /var/lib/apt/lists/* && \
+	find /usr/local/cuda/lib64/ -type f -name 'lib*_static.a' -not -name 'libcudart_static.a' -delete && \
+	rm /usr/lib/x86_64-linux-gnu/libcudnn_static_v7.a
+
+# Install bazel
+RUN echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list && \
+    curl https://bazel.build/bazel-release.pub.gpg | apt-key add - && \
+    apt-get update && \
+    apt-get install -y bazel
 
 # Install Anaconda
 WORKDIR /
@@ -24,9 +52,6 @@ RUN wget "https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh"
     /conda/bin/conda config --add channels conda-forge && \
     /conda/bin/conda update --yes -n base conda && \
     /conda/bin/conda update --all --yes
-
-#COPY setup_cuda.sh /setup_cuda.sh
-#RUN chmod +x /setup.sh && /setup_cuda.sh
 
 RUN mkdir -p /opt/cuda/${CUDA_VERSION}
 RUN curl -v -L "https://developer.nvidia.com/compute/cuda/${CUDA_SERIES}/Prod2/local_installers/cuda_${CUDA_VERSION}_linux" -o /tmp/cuda-run
@@ -45,16 +70,7 @@ RUN cp cuda/include/cudnn.h /usr/local/cuda/include
 RUN cp cuda/lib64/libcudnn* /usr/local/cuda/lib64
 RUN chmod a+r /usr/local/cuda/include/cudnn.h /usr/local/cuda/lib64/libcudnn*
 
-#RUN curl -v -L "https://www.dropbox.com/s/rhcb7jr6o5h8in7/nccl_2.2.13-1%2Bcuda9.2_x86_64.txz" -o /tmp/nccl.txz
-#RUN tar -xf /tmp/nccl.txz
-#RUN mv nccl* nccl
-#RUN cp -R nccl/include/* /opt/cuda/${CUDA_VERSION}/include/
-#RUN cp -R nccl/lib/* /opt/cuda/${CUDA_VERSION}/lib64/
-
 # Link NCCL libray and header where the build script expects them.
-RUN apt-get install -y libnccl2=2.2.13-1+cuda9.2 libnccl-dev=2.2.13-1+cuda9.2
-RUN find / -name libnccl.so*
-RUN find / -name nccl.h
 RUN mkdir /usr/local/cuda/lib &&  \
 	ln -s /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/local/cuda/lib/libnccl.so.2 && \
     ln -s /usr/include/nccl.h /usr/local/cuda/include/nccl.h
