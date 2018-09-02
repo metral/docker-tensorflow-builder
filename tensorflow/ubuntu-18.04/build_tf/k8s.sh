@@ -1,15 +1,30 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -e
+
+wget "https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh" -O "miniconda.sh" && \
+    bash "miniconda.sh" -b -p "/conda" && \
+    rm miniconda.sh && \
+    echo PATH='/conda/bin:$PATH' >> /root/.bashrc && \
+    /conda/bin/conda config --add channels conda-forge && \
+    /conda/bin/conda update --yes -n base conda && \
+    /conda/bin/conda update --all --yes
+
+curl -v -L "https://www.dropbox.com/s/rhcb7jr6o5h8in7/nccl_2.2.13-1%2Bcuda9.2_x86_64.txz" -o /tmp/nccl.txz
+tar -xf /tmp/nccl.txz
+mv nccl* nccl
+cp -R nccl/include/* /usr/local/cuda/include/
+mkdir -p /usr/local/cuda/lib && cp -R nccl/lib/* /usr/local/cuda/lib/
+
+apt-get update && apt-get install gcc-6 g++-6 -y
+update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 1
+
+chmod +x /conda/bin/*
 export PATH="/conda/bin:/usr/bin:$PATH"
 
-ls -alh /usr/local/cuda-9.2.148_396.37/include/nccl.h
-
-# Install an appropriate Python environment
-chmod +x /conda/bin/*
-#conda create --yes -n tensorflow python==$PYTHON_VERSION
-#source activate tensorflow
-#conda install --yes numpy wheel bazel
-#conda install --yes numpy wheel
+conda create --yes -n tensorflow python==$PYTHON_VERSION
+conda create --yes -n tensorflow
+source activate tensorflow
+conda install --yes numpy wheel bazel
 
 # Compile TensorFlow
 
@@ -19,12 +34,15 @@ chmod +x /conda/bin/*
 
 cd /
 rm -fr tensorflow/
-git clone --depth 1 --branch $TF_VERSION_GIT_TAG "https://github.com/metral/tensorflow.git"
+git clone --depth 1 --branch v1.10.1 "https://github.com/tensorflow/tensorflow.git"
+#git clone --depth 1 --branch $TF_VERSION_GIT_TAG "https://github.com/metral/tensorflow.git"
 
 TF_ROOT=/tensorflow
 cd $TF_ROOT
 
 # Python path options
+export CUDA_VERSION="9.1.85_387.26"
+export CUDNN_VERSION="7.1.3"
 export PYTHON_BIN_PATH=$(which python)
 export PYTHON_LIB_PATH="$($PYTHON_BIN_PATH -c 'import site; print(site.getsitepackages()[0])')"
 export PYTHONPATH=${TF_ROOT}/lib
@@ -55,44 +73,27 @@ export TF_NEED_AWS=0
 export GCC_HOST_COMPILER_PATH=$(which gcc)
 export CC_OPT_FLAGS="-march=native"
 
-#if [ "$USE_GPU" -eq "1" ]; then
-	# Cuda parameters
-export CUDA_TOOLKIT_PATH=/usr/local/cuda-${CUDA_VERSION}
-export CUDNN_INSTALL_PATH=/usr/local/cuda-${CUDA_VERSION}
+# CUDA parameters
+export CUDA_TOOLKIT_PATH=/usr/local/cuda
+export CUDNN_INSTALL_PATH=/usr/local/cuda
 export TF_CUDA_VERSION="$CUDA_VERSION"
 export TF_CUDNN_VERSION="$CUDNN_VERSION"
 export TF_NEED_CUDA=1
 export TF_NEED_TENSORRT=0
 export TF_NCCL_VERSION=2.2
-export NCCL_INSTALL_PATH=/usr/local/cuda-${CUDA_VERSION}
+export NCCL_INSTALL_PATH=/usr/local/cuda
 
 # Those two lines are important for the linking step.
 export LD_LIBRARY_PATH="$CUDA_TOOLKIT_PATH/lib64:${LD_LIBRARY_PATH}"
 ldconfig
-#ls -alh /opt/cuda/9.2.148_396.37/include/nccl.h
-#fi
 
 # Compilation
-ls -alh /usr/local/cuda-9.2.148_396.37/include/nccl.h
-ls -alh /usr/local/cuda-9.2.148_396.37/lib
-ls -alh /usr/local/cuda-9.2.148_396.37/lib64
 ./configure
 
-
-#if [ "$USE_GPU" -eq "1" ]; then
-
-	bazel build --config=opt \
-	    		--config=cuda \
-	    		--action_env="LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" \
-	    		//tensorflow/tools/pip_package:build_pip_package
-
-#else
-#
-#	bazel build --config=opt \
-#			    --action_env="LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" \
-#			    //tensorflow/tools/pip_package:build_pip_package
-#
-#fi
+bazel build --config=opt \
+    --config=cuda \
+    --action_env="LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" \
+    //tensorflow/tools/pip_package:build_pip_package
 
 # Project name can only be set for TF > 1.8
 #PROJECT_NAME="tensorflow_gpu_cuda_${TF_CUDA_VERSION}_cudnn_${TF_CUDNN_VERSION}"
